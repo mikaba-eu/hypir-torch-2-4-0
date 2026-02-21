@@ -1,0 +1,11 @@
+diffusers==0.32.2
+transformers==4.49.0
+peft==0.14.0
+accelerate==1.4.0
+omegaconf==2.3.0
+einops==0.8.1
+numpy
+Pillow
+tqdm
+safetensors
+opencv-python-headless==4.11.0.86
