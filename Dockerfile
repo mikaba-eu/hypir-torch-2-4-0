@@ -1,13 +1,19 @@
 FROM runpod/pytorch:2.4.0-py3.11-cuda12.4.1-devel-ubuntu22.04
 
+LABEL org.opencontainers.image.source=https://github.com/mikaba-eu/hypir-torch-2-4-0
+LABEL org.opencontainers.image.description="RunPod image for HYPIR batch upscaling"
+
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     TOKENIZERS_PARALLELISM=false \
     HF_HUB_DISABLE_TELEMETRY=1 \
-    PYTHONPYCACHEPREFIX=/dev/shm/pycache
+    OMP_NUM_THREADS=1 \
+    MKL_NUM_THREADS=1 \
+    OPENBLAS_NUM_THREADS=1 \
+    VECLIB_MAXIMUM_THREADS=1 \
+    NUMEXPR_NUM_THREADS=1
 
-# Minimal OS deps (opencv-python-headless often needs libglib; libgl can still be required in some cases)
 RUN apt-get update && apt-get install -y --no-install-recommends \
       libglib2.0-0 \
       libgl1 \
@@ -18,23 +24,31 @@ WORKDIR /workspace
 
 COPY requirements.txt /tmp/requirements.txt
 
-# Upgrade pip and install deps
 RUN python -m pip install --upgrade pip setuptools wheel \
  && python -m pip install --no-cache-dir -r /tmp/requirements.txt
 
-# Optional: import smoke test (fails the build early if something is wrong)
 RUN python -c "import diffusers, transformers, peft, accelerate, omegaconf, einops, numpy, PIL, tqdm, safetensors; import cv2; print('imports-ok')"
 
-# Optional: precompile bytecode to speed up cold imports
-RUN python - <<'PY'\n\
-import importlib, pathlib, compileall\n\
-mods = ['diffusers','transformers','peft','accelerate','omegaconf','einops','tqdm','safetensors','PIL']\n\
-for m in mods:\n\
-    mod = importlib.import_module(m)\n\
-    p = pathlib.Path(mod.__file__).resolve()\n\
-    root = p.parent if p.name != '__init__.py' else p.parent\n\
-    compileall.compile_dir(str(root), quiet=1)\n\
-print('compileall-ok')\n\
-PY
+RUN env -u PYTHONPYCACHEPREFIX python - <<'PY'
+import importlib
+import pathlib
+import compileall
 
-# Do NOT override ENTRYPOINT/CMD so RunPod's base image behavior stays intact.
+mods = [
+    "diffusers",
+    "transformers",
+    "peft",
+    "accelerate",
+    "omegaconf",
+    "einops",
+    "tqdm",
+    "safetensors",
+    "PIL",
+]
+for m in mods:
+    mod = importlib.import_module(m)
+    p = pathlib.Path(mod.__file__).resolve()
+    compileall.compile_dir(str(p.parent), quiet=1)
+
+print("compileall-ok")
+PY
