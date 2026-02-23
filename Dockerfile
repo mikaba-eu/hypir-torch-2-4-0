@@ -52,3 +52,9 @@ for m in mods:
 
 print("compileall-ok")
 PY
+
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+COPY run.py /workspace/run.py
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
